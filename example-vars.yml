@@ -1,0 +1,36 @@
+# Path on target machine for the Zulip installation
+DOCKER_FILES_PATH: ""
+
+DOMAIN: "zulip.example.org"
+ADMIN_EMAIL: "zulip.admin@example.org"
+
+LOADBALANCER_IPS: "1.2.3.4"
+
+# Various secrets - put long strings here, e.g. from `pwgen 64 -s 1`
+REDIS_PASSWORD: ""
+MEMCACHED_PASSWORD: ""
+RABBITMQ_PASSWORD: ""
+DB_PASSWORD: ""
+SECRET_KEY: ""
+
+# Email settings (either TLS or SSL must be True)
+EMAIL_HOST: ""
+EMAIL_HOST_USER: ""
+EMAIL_USE_TLS: True
+EMAIL_USE_SSL: False
+EMAIL_PORT:   # usually 587 for TLS, 465 for SSL
+EMAIL_PASSWORD: ""
+
+ADD_TOKENS_TO_NOREPLY_ADDRESS: False
+TOKENIZED_NOREPLY_EMAIL_ADDRESS: ""
+NOREPLY_EMAIL_ADDRESS: "zulip.noreply@example.org"
+INSTALLATION_NAME: "Zulip"
+
+# SSO
+ZULIP_AUTH_BACKENDS: "GenericOpenIdConnectBackend,EmailAuthBackend"
+# if GenericOpenIdConnectBackend is used:
+OIDC_URL: ""
+OIDC_ID: ""
+OIDC_DISPLAY_NAME: ""
+OIDC_CLIENT_ID: ""
+SOCIAL_AUTH_OIDC_SECRET: ""

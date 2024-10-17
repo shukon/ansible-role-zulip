@@ -1,0 +1,10 @@
+---
+
+- name: Deploy Zulip
+
+  hosts: zulip
+  become: yes
+  become_user: root
+
+  roles:
+    - docker-zulip

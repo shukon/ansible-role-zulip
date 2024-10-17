@@ -1,0 +1,150 @@
+services:
+  db:
+    image: "zulip/zulip-postgresql:14"
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: "zulip"
+      POSTGRES_USER: "zulip"
+      # Note that you need to do a manual `ALTER ROLE` query if you
+      # change this on a system after booting the postgres container
+      # the first time on a host.  Instructions are available in README.md.
+      POSTGRES_PASSWORD: "{{ DB_PASSWORD }}"
+    volumes:
+      - "{{ DOCKER_FILES_PATH }}/volumes/postgresql-14:/var/lib/postgresql/data:rw"
+    networks:
+      - zulip
+
+  memcached:
+    image: "memcached:alpine"
+    restart: unless-stopped
+    command:
+      - "sh"
+      - "-euc"
+      - |
+        echo 'mech_list: plain' > "$$SASL_CONF_PATH"
+        echo "zulip@$$HOSTNAME:$$MEMCACHED_PASSWORD" > "$$MEMCACHED_SASL_PWDB"
+        echo "zulip@localhost:$$MEMCACHED_PASSWORD" >> "$$MEMCACHED_SASL_PWDB"
+        exec memcached -S
+    environment:
+      SASL_CONF_PATH: "/home/memcache/memcached.conf"
+      MEMCACHED_SASL_PWDB: "/home/memcache/memcached-sasl-db"
+      MEMCACHED_PASSWORD: "{{ MEMCACHED_PASSWORD }}"
+    networks:
+      - zulip
+
+  rabbitmq:
+    image: "rabbitmq:3.7.7"
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: "zulip"
+      RABBITMQ_DEFAULT_PASS: "{{ RABBITMQ_PASSWORD }}"
+    volumes:
+      - "{{ DOCKER_FILES_PATH }}/volumes/rabbitmq:/var/lib/rabbitmq:rw"
+    networks:
+      - zulip
+
+  redis:
+    image: "redis:alpine"
+    restart: unless-stopped
+    command: redis-server --requirepass "{{ REDIS_PASSWORD }}"
+    volumes:
+      - "{{ DOCKER_FILES_PATH }}/volumes/redis:/data:rw"
+    networks:
+      - zulip
+
+  zulip:
+    image: "zulip/docker-zulip:9.1-1"
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_HOST_PORT: "5432"
+      DB_USER: "zulip"
+      SSL_CERTIFICATE_GENERATION: "self-signed"
+      SETTING_MEMCACHED_LOCATION: "memcached:11211"
+      SETTING_RABBITMQ_HOST: rabbitmq
+      SETTING_REDIS_HOST: redis
+      DISABLE_HTTPS: true
+      SETTING_USE_X_FORWARDED_HOST: "True"
+      # These should match RABBITMQ_DEFAULT_PASS, POSTGRES_PASSWORD,
+      # MEMCACHED_PASSWORD, and REDIS_PASSWORD above.
+      SECRETS_rabbitmq_password: "{{ RABBITMQ_PASSWORD }}"
+      SECRETS_postgres_password: "{{ DB_PASSWORD }}"
+      SECRETS_memcached_password: "{{ MEMCACHED_PASSWORD }}"
+      SECRETS_redis_password: "{{ REDIS_PASSWORD }}"
+      SECRETS_secret_key: "{{ SECRET_KEY }}"
+      SETTING_EXTERNAL_HOST: "{{ DOMAIN }}"
+
+      LOADBALANCER_IPS: "{{ LOADBALANCER_IPS }}"
+
+      SETTING_ZULIP_ADMINISTRATOR: "{{ ADMIN_EMAIL }}"
+      SETTING_EMAIL_HOST: "{{ EMAIL_HOST }}"
+      SETTING_EMAIL_HOST_USER: "{{ EMAIL_HOST_USER }}"
+      SETTING_EMAIL_PORT: "{{ EMAIL_PORT }}"
+      # It seems that the email server needs to use ssl or tls and can't be used without it
+      SETTING_EMAIL_USE_TLS: "{{ EMAIL_USE_TLS }}"
+      SETTING_EMAIL_USE_SSL: "{{ EMAIL_USE_SSL }}"
+
+      SETTING_ADD_TOKENS_TO_NOREPLY_ADDRESS: "{{ ADD_TOKENS_TO_NOREPLY_ADDRESS }}"
+      SETTING_TOKENIZED_NOREPLY_EMAIL_ADDRESS: "{{ TOKENIZED_NOREPLY_EMAIL_ADDRESS }}"
+      SETTING_NOREPLY_EMAIL_ADDRESS: "{{ NOREPLY_EMAIL_ADDRESS }}"
+      SETTING_INSTALLATION_NAME: "{{ INSTALLATION_NAME }}"
+
+      SECRETS_email_password: "{{ EMAIL_PASSWORD }}"
+
+      ZULIP_AUTH_BACKENDS: "{{ ZULIP_AUTH_BACKENDS }}"
+      SETTING_SOCIAL_AUTH_OIDC_ENABLED_IDPS: >
+        {
+         "{{ OIDC_ID }}": {
+            "oidc_url": "{{ OIDC_URL }}",
+            "display_name": "OIDC_DISPLAY_NAME",
+            #"display_icon": null,
+            "client_id": "{{ OIDC_CLIENT_ID }}",
+            "secret": get_secret("social_auth_oidc_secret"),
+            "auto_signup": True
+            }
+        }
+      SECRETS_social_auth_oidc_secret: "{{ SOCIAL_AUTH_OIDC_SECRET }}"
+
+      # Uncomment this when configuring the mobile push notifications service
+      # SETTING_PUSH_NOTIFICATION_BOUNCER_URL: 'https://push.zulipchat.com'
+    volumes:
+      - "{{ DOCKER_FILES_PATH }}/volumes/zulip:/data:rw"
+      - "{{ DOCKER_FILES_PATH }}/volumes/zulip_config/settings.py:/etc/zulip/settings.py"
+#    ulimits:
+#      nofile:
+#        soft: 1000000
+#        hard: 1048576
+    depends_on:
+      - db
+      - memcached
+      - rabbitmq
+      - redis
+    networks:
+      - traefik
+      - zulip
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik
+      - traefik.constraint-label=traefik
+      - traefik.http.routers.zulip.tls=true
+      - traefik.http.routers.zulip.tls.certresolver=le
+      - traefik.http.routers.zulip.rule=Host(`{{ DOMAIN }}`)
+      - traefik.http.routers.zulip.entrypoints=web-secure
+      - traefik.http.routers.zulip.service=zulip
+      - traefik.http.services.zulip.loadbalancer.server.port=80
+
+volumes:
+  zulip:
+  postgresql-14:
+  rabbitmq:
+  redis:
+  zulip_config:
+
+networks:
+  traefik:
+    external: true
+  zulip:

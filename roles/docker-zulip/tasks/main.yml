@@ -1,0 +1,30 @@
+---
+
+- name: Ensure volumes-dir exists
+  file:
+    path: "{{ DOCKER_FILES_PATH }}/volumes"
+    state: directory
+
+- name: Copy project files
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ DOCKER_FILES_PATH }}/docker-compose.yml"
+    owner: root
+    group: root
+    mode: '0400'
+
+- name: Ensure docker-container is down
+  community.docker.docker_compose_v2:
+    project_src: "{{ DOCKER_FILES_PATH }}"
+    state: absent
+
+- name: Create and start services
+  community.docker.docker_compose_v2:
+    project_src: "{{ DOCKER_FILES_PATH }}"
+    state: present
+    pull: always
+    build: always
+  register: output
+
+- debug:
+    var: output
