@@ -96,7 +96,7 @@ services:
         {
          "{{ OIDC_ID }}": {
             "oidc_url": "{{ OIDC_URL }}",
-            "display_name": "OIDC_DISPLAY_NAME",
+            "display_name": "{{ OIDC_DISPLAY_NAME }}",
             #"display_icon": null,
             "client_id": "{{ OIDC_CLIENT_ID }}",
             "secret": get_secret("social_auth_oidc_secret"),
